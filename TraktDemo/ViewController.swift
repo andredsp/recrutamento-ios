@@ -9,18 +9,15 @@
 import UIKit
 import OAuthSwift
 
-enum Media {
-    case Show (title: String, id: String)
-}
-
-class ViewController: UIViewController, UICollectionViewDelegate {
+class ViewController: UIViewController, UICollectionViewDataSource {
+    typealias Show = (title:String, id:String)
     
     // Views
     @IBOutlet weak var loginButton: UIButton!
     @IBOutlet weak var showsCollection: UICollectionView!
     
     // Model
-    var list = [Media]()
+    var shows = [Show]()
     var authorized = false
     let oauthswift = OAuth2Swift(
         consumerKey:    "8fd9163f5955a30b2a01fe19b9bc6113151348c454cc727d234267b8c18a87c4",
@@ -111,16 +108,15 @@ class ViewController: UIViewController, UICollectionViewDelegate {
                 do {
                     let json = try NSJSONSerialization.JSONObjectWithData(data, options: .AllowFragments)
                 
-                    var newList = [Media]()
+                    var newList = [Show]()
                     
                     if let shows = json as? [[String: AnyObject]] {
                         
                         for show in shows {
-                            let media = Media.Show(title: show["title"] as! String, id: "")
-                            newList.append(media)
+                            newList.append((title: show["title"] as! String, id: ""))
                         }
                         
-                        self.list = newList
+                        self.shows = newList
                         self.refreshUI()
                     }
                 } catch {
@@ -141,7 +137,26 @@ class ViewController: UIViewController, UICollectionViewDelegate {
         authorize()
     }
     
-    // MARK: - UICollectionViewDelegate
+    // MARK: - UICollectionViewDataSource
+    
+    func collectionView(collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        return shows.count
+    }
+    
+    func collectionView(collectionView: UICollectionView, cellForItemAtIndexPath indexPath: NSIndexPath) -> UICollectionViewCell {
+        // Get the cell
+        let cell = collectionView.dequeueReusableCellWithReuseIdentifier("thumbnail", forIndexPath: indexPath)
+        
+        // Get the model
+        let show = shows[indexPath.row]
+        
+        // Hook the model to the view
+        let titleLabel = cell.contentView.viewWithTag(20) as! UILabel
+        titleLabel.text = show.title
+        
+        
+        return cell
+    }
     
 }
 
