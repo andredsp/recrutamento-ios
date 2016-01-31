@@ -10,7 +10,7 @@ import UIKit
 import OAuthSwift
 
 class ViewController: UIViewController, UICollectionViewDataSource {
-    typealias Show = (title:String, id:String)
+    typealias Show = (title:String?, image:String?)
     
     // Views
     @IBOutlet weak var loginButton: UIButton!
@@ -58,10 +58,10 @@ class ViewController: UIViewController, UICollectionViewDataSource {
         if authorized {
             showsCollection.reloadData()
             
-            let logoutButton = UIBarButtonItem(title: "Sair", style: UIBarButtonItemStyle.Plain, target: self, action: "logout")
-            navigationItem.setLeftBarButtonItem(logoutButton, animated: true)
+//            let logoutButton = UIBarButtonItem(title: "Sair", style: UIBarButtonItemStyle.Plain, target: self, action: "logout")
+//            navigationItem.setLeftBarButtonItem(logoutButton, animated: true)
         } else {
-            navigationItem.setLeftBarButtonItem(nil, animated: true)
+//            navigationItem.setLeftBarButtonItem(nil, animated: true)
         }
     }
     
@@ -93,7 +93,7 @@ class ViewController: UIViewController, UICollectionViewDataSource {
     }
     
     func getData() {
-        oauthswift.client.request("https://api-v2launch.trakt.tv/shows/popular",
+        oauthswift.client.request("https://api-v2launch.trakt.tv/shows/popular?extended=images",
             method: .GET,
             headers: [
                 "Content-Type": "application/json",
@@ -101,34 +101,34 @@ class ViewController: UIViewController, UICollectionViewDataSource {
                 "trakt-api-key": "8fd9163f5955a30b2a01fe19b9bc6113151348c454cc727d234267b8c18a87c4",
             ],
             success: { data, response in
-                let dataString = NSString(data: data, encoding: NSUTF8StringEncoding)
-                print(dataString)
-                
-                
-                do {
-                    let json = try NSJSONSerialization.JSONObjectWithData(data, options: .AllowFragments)
-                
-                    var newList = [Show]()
-                    
-                    if let shows = json as? [[String: AnyObject]] {
-                        
-                        for show in shows {
-                            newList.append((title: show["title"] as! String, id: ""))
-                        }
-                        
-                        self.shows = newList
-                        self.refreshUI()
-                    }
-                } catch {
-                    print("error serializing JSON: \(error)")
-                }
-                
+//                let dataString = NSString(data: data, encoding: NSUTF8StringEncoding)
+//                print(dataString)
+                self.processJSON(data)                
             }
             , failure: { error in
                 print(error)
             }
         )
         
+    }
+    
+    func processJSON(data: NSData) {
+        do {
+            let json = try NSJSONSerialization.JSONObjectWithData(data, options: .AllowFragments)
+            
+            var newList = [Show]()
+            for show in json as! NSArray {
+                let title = show["title"] as? String
+                let image = ((show["images"] as? NSDictionary)? ["poster"] as? NSDictionary)? ["thumb"] as? String
+                newList.append((title: title, image: image))
+            }
+            
+            self.shows = newList
+            self.refreshUI()
+
+        } catch {
+            print("error serializing JSON: \(error)")
+        }
     }
 
     // MARK: - Actions
@@ -151,12 +151,38 @@ class ViewController: UIViewController, UICollectionViewDataSource {
         let show = shows[indexPath.row]
         
         // Hook the model to the view
+        let imageView = cell.contentView.viewWithTag(10) as! UIImageView
         let titleLabel = cell.contentView.viewWithTag(20) as! UILabel
         titleLabel.text = show.title
         
+        imageView.image = nil
+        if let imageURL = show.image {
+            imageView.downloadedFrom(link: imageURL, contentMode: UIViewContentMode.ScaleAspectFill)
+        }
         
         return cell
     }
     
 }
 
+// MARK: - Image download
+
+extension UIImageView {
+    func downloadedFrom(link link:String, contentMode mode: UIViewContentMode) {
+        guard
+            let url = NSURL(string: link)
+            else {return}
+        contentMode = mode
+        NSURLSession.sharedSession().dataTaskWithURL(url, completionHandler: { (data, response, error) -> Void in
+            guard
+                let httpURLResponse = response as? NSHTTPURLResponse where httpURLResponse.statusCode == 200,
+                let mimeType = response?.MIMEType where mimeType.hasPrefix("image"),
+                let data = data where error == nil,
+                let image = UIImage(data: data)
+                else { return }
+            dispatch_async(dispatch_get_main_queue()) { () -> Void in
+                self.image = image
+            }
+        }).resume()
+    }
+}
