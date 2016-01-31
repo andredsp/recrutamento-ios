@@ -15,7 +15,8 @@ class ViewController: UIViewController, UICollectionViewDataSource {
     // Views
     @IBOutlet weak var loginButton: UIButton!
     @IBOutlet weak var showsCollection: UICollectionView!
-    
+    var refreshControl:UIRefreshControl!
+
     // Model
     var shows = [Show]()
     var authorized = false
@@ -32,6 +33,13 @@ class ViewController: UIViewController, UICollectionViewDataSource {
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view, typically from a nib.
+        
+        self.refreshControl = UIRefreshControl()
+        self.refreshControl.attributedTitle = NSAttributedString(string: "Puxe para recarregar")
+        self.refreshControl.addTarget(self, action: "getData", forControlEvents: UIControlEvents.ValueChanged)
+        
+        self.showsCollection.addSubview(refreshControl)
+        self.showsCollection.alwaysBounceVertical = true
     }
     
     override func viewWillAppear(animated: Bool) {
@@ -56,12 +64,12 @@ class ViewController: UIViewController, UICollectionViewDataSource {
         showsCollection.hidden = !authorized
         loginButton.hidden = authorized
         if authorized {
-            showsCollection.reloadData()
-            
-//            let logoutButton = UIBarButtonItem(title: "Sair", style: UIBarButtonItemStyle.Plain, target: self, action: "logout")
-//            navigationItem.setLeftBarButtonItem(logoutButton, animated: true)
-        } else {
-//            navigationItem.setLeftBarButtonItem(nil, animated: true)
+            UIView.animateWithDuration(0.2, animations: {
+                self.refreshControl.endRefreshing()
+                
+                }, completion: { (finished: Bool) in
+                    self.showsCollection.reloadData()
+            })
         }
     }
     
@@ -84,6 +92,7 @@ class ViewController: UIViewController, UICollectionViewDataSource {
             }, failure: {(error:NSError!) -> Void in
                 print(error.localizedDescription)
                 //                self.presentAlert("Error", message: error!.localizedDescription)
+                self.refreshUI()
         })
     }
     
@@ -107,6 +116,7 @@ class ViewController: UIViewController, UICollectionViewDataSource {
             }
             , failure: { error in
                 print(error)
+                self.refreshUI()
             }
         )
         
